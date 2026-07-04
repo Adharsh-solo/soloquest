@@ -59,8 +59,13 @@ class NearbyPlacesView(APIView):
             return Response({"error": "Invalid coordinates"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Cache key based on rounded lat/lng
-        cache_key = f"nearby_places_{round(lat, 3)}_{round(lng, 3)}_{radius}"
-        cached_result = cache.get(cache_key)
+        cache_key = f"nearby_places_v2_{round(lat, 3)}_{round(lng, 3)}_{radius}"
+        cached_result = None
+        try:
+            cached_result = cache.get(cache_key)
+        except Exception as e:
+            print(f"Redis cache error: {e}")
+
         if cached_result:
             return Response(json.loads(cached_result))
 
@@ -136,8 +141,12 @@ class NearbyPlacesView(APIView):
         # Re-sort combined
         final_results.sort(key=lambda x: x['distance_km'])
 
-        # Cache for 1 hour
-        cache.set(cache_key, json.dumps(final_results), 3600)
+        # Cache for 1 hour only if we got results
+        if final_results:
+            try:
+                cache.set(cache_key, json.dumps(final_results), 3600)
+            except Exception as e:
+                print(f"Redis cache error: {e}")
 
         return Response(final_results)
 
@@ -149,8 +158,13 @@ class LocationSearchView(APIView):
         if not query:
             return Response({"error": "Please provide a search query"}, status=status.HTTP_400_BAD_REQUEST)
 
-        cache_key = f"geoapify_search_{query.lower()}"
-        cached_result = cache.get(cache_key)
+        cache_key = f"geoapify_search_v2_{query.lower()}"
+        cached_result = None
+        try:
+            cached_result = cache.get(cache_key)
+        except Exception as e:
+            print(f"Redis cache error: {e}")
+
         if cached_result:
             return Response(json.loads(cached_result))
 
@@ -174,7 +188,11 @@ class LocationSearchView(APIView):
                     if 'lat' in props and 'lon' in props:
                         results.append({'lat': str(props['lat']), 'lon': str(props['lon'])})
                 
-                cache.set(cache_key, json.dumps(results), 86400) # Cache for 1 day
+                if results:
+                    try:
+                        cache.set(cache_key, json.dumps(results), 86400) # Cache for 1 day
+                    except Exception as e:
+                        print(f"Redis cache error: {e}")
                 return Response(results)
         except Exception as e:
             return Response({"error": "Search service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
