@@ -16,6 +16,10 @@ const Home = () => {
   const [favorites, setFavorites] = useState([]);
   const navigate = useNavigate();
 
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const username = localStorage.getItem('username') || '';
+  const displayName = username.includes('@') ? username.split('@')[0] : username || 'User';
+
   useEffect(() => {
     sessionStorage.setItem('savedPlaces', JSON.stringify(places));
   }, [places]);
@@ -23,6 +27,16 @@ const Home = () => {
   useEffect(() => {
     sessionStorage.setItem('savedSearchQuery', searchQuery);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownOpen && !event.target.closest('.profile-section')) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dropdownOpen]);
 
   const clearSearch = () => {
     setSearchQuery('');
@@ -48,7 +62,14 @@ const Home = () => {
   const fetchFavorites = async () => {
     try {
       const res = await api.get('/favorites/');
-      setFavorites(res.data.map(f => f.place.id));
+      const favIds = [];
+      res.data.forEach(f => {
+        favIds.push(f.place.id);
+        if (f.place.geoapify_id) {
+          favIds.push(f.place.geoapify_id);
+        }
+      });
+      setFavorites(favIds);
     } catch (err) {
       console.error(err);
     }
@@ -110,7 +131,7 @@ const Home = () => {
       const placeId = place.id;
       if (favorites.includes(placeId)) {
         const favRes = await api.get('/favorites/');
-        const favItem = favRes.data.find(f => f.place.id === placeId);
+        const favItem = favRes.data.find(f => f.place.id === placeId || f.place.geoapify_id === placeId);
         if (favItem) {
           await api.delete(`/favorites/${favItem.id}/`);
           setFavorites(favorites.filter(id => id !== placeId));
@@ -127,6 +148,8 @@ const Home = () => {
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    sessionStorage.removeItem('savedPlaces');
+    sessionStorage.removeItem('savedSearchQuery');
     navigate('/login');
   };
 
@@ -138,12 +161,59 @@ const Home = () => {
           <Link to="/favorites" className="btn-icon" title="Favorites">
             <Heart size={20} />
           </Link>
-          <div className="profile-section">
-            <User size={18} className="profile-icon" />
-            <span className="username">{localStorage.getItem('username') || 'User'}</span>
-            <button onClick={handleLogout} className="btn-icon" title="Logout">
-              <LogOut size={20} />
+          <div className="profile-section" style={{ position: 'relative' }}>
+            <button 
+              className="profile-btn" 
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px' }}
+              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+              onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+            >
+              <User size={18} className="profile-icon" />
+              <span className="username">{displayName}</span>
             </button>
+            
+            {dropdownOpen && (
+              <div className="profile-dropdown" style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '0.5rem',
+                background: '#1a1f2e',
+                border: '1px solid #2d3748',
+                borderRadius: '8px',
+                padding: '0.5rem',
+                minWidth: '220px',
+                zIndex: 50,
+                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)'
+              }}>
+                <div style={{ padding: '0.5rem', borderBottom: '1px solid #2d3748', marginBottom: '0.5rem', color: '#a0aec0', fontSize: '0.875rem', wordBreak: 'break-all' }}>
+                  {username}
+                </div>
+                <button 
+                  onClick={handleLogout} 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    width: '100%',
+                    padding: '0.5rem',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#ff4a4a',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    borderRadius: '4px',
+                    fontSize: '0.875rem',
+                    fontWeight: 500
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 74, 74, 0.1)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <LogOut size={16} /> Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
