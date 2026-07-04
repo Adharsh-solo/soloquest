@@ -241,3 +241,9 @@ class FavoriteViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+class PingView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        return Response({"status": "ok", "message": "Server is awake!"}, status=status.HTTP_200_OK)
